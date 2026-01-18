@@ -3,15 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Simple Chat UI</title>
+  <title>Chat UI</title>
   <style>
     :root {
       --bg: #0f172a;
       --panel: #111827;
+      --panel-2: #020617;
       --user: #2563eb;
       --bot: #1f2937;
       --text: #e5e7eb;
       --muted: #9ca3af;
+      --accent: #22c55e;
     }
 
     * { box-sizing: border-box; }
@@ -21,28 +23,66 @@
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: var(--bg);
       color: var(--text);
-      display: flex;
-      justify-content: center;
-      align-items: center;
       height: 100vh;
+      display: flex;
     }
 
-    .chat-container {
-      width: 100%;
-      max-width: 720px;
-      height: 90vh;
-      background: var(--panel);
-      border-radius: 12px;
+    /* Sidebar */
+    .sidebar {
+      width: 260px;
+      background: var(--panel-2);
       display: flex;
       flex-direction: column;
-      overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      border-right: 1px solid #1f2937;
     }
 
-    header {
-      padding: 16px;
+    .sidebar header {
+      padding: 14px;
       font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .chat-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .chat-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .chat-item.active {
+      background: #1f2937;
+    }
+
+    .chat-item:hover {
+      background: #1f2937;
+    }
+
+    .dots {
+      cursor: pointer;
+      color: var(--muted);
+    }
+
+    /* Main */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      padding: 12px 16px;
       border-bottom: 1px solid #1f2937;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     .messages {
@@ -58,23 +98,15 @@
       max-width: 80%;
       padding: 12px 14px;
       border-radius: 10px;
-      line-height: 1.4;
       white-space: pre-wrap;
     }
 
-    .message.user {
-      background: var(--user);
-      align-self: flex-end;
-    }
-
-    .message.bot {
-      background: var(--bot);
-      align-self: flex-start;
-    }
+    .user { background: var(--user); align-self: flex-end; }
+    .bot { background: var(--bot); align-self: flex-start; }
 
     footer {
-      display: flex;
       padding: 12px;
+      display: flex;
       gap: 8px;
       border-top: 1px solid #1f2937;
     }
@@ -92,139 +124,199 @@
       padding: 12px 16px;
       border-radius: 8px;
       border: none;
-      background: #22c55e;
+      background: var(--accent);
       font-weight: 600;
       cursor: pointer;
     }
 
-    button:disabled {
-      background: #4b5563;
-      cursor: not-allowed;
+    /* Modal */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
     }
 
-    .hint {
-      font-size: 12px;
-      color: var(--muted);
-      text-align: center;
-      padding: 6px;
+    .modal-content {
+      background: var(--panel);
+      padding: 20px;
+      border-radius: 12px;
+      width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
+
+    .modal-content input {
+      background: #020617;
+      color: var(--text);
+    }
+
+    .modal.show { display: flex; }
   </style>
 </head>
 <body>
-  <div class="chat-container">
-    <header>Chat <span style="font-size:12px;color:#9ca3af">(Configurable API)</span></header>
+
+  <div class="sidebar">
+    <header>
+      <span>Chats</span>
+      <button id="addChat">＋</button>
+    </header>
+    <div id="chatList" class="chat-list"></div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <span id="chatTitle">New Chat</span>
+      <button id="openSettings">Settings</button>
+    </div>
+
     <div id="messages" class="messages"></div>
-    <details style="padding:12px;border-top:1px solid #1f2937">
-      <summary style="cursor:pointer;font-size:14px">API Settings</summary>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-        <input id="baseUrl" placeholder="Base URL (https://example.com)" />
-        <input id="apiPath" placeholder="API Path (/chat)" />
-        <input id="apiKey" placeholder="API Key (optional)" />
-      </div>
-    </details>
-    <div class="hint">Configure <code>API_URL</code> in the script section</div>
+
     <footer>
       <input id="input" placeholder="Type a message..." />
       <button id="send">Send</button>
     </footer>
   </div>
 
-  <script>
-    // ==============================
-    // CONFIGURATION
-    // ==============================
-    // ==============================
-    // CONFIGURATION (editable in UI)
-    // ==============================
-    let baseUrl = localStorage.getItem("baseUrl") || "";
-    let apiPath = localStorage.getItem("apiPath") || "";
-    let apiKey = localStorage.getItem("apiKey") || "";
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="modal">
+    <div class="modal-content">
+      <strong>API Settings</strong>
+      <input id="baseUrl" placeholder="Base URL" />
+      <input id="apiPath" placeholder="API Path" />
+      <input id="apiKey" placeholder="API Key (optional)" />
+      <button id="closeSettings">Close</button>
+    </div>
+  </div>
 
-    const baseUrlInput = document.getElementById("baseUrl");
-    const apiPathInput = document.getElementById("apiPath");
-    const apiKeyInput = document.getElementById("apiKey");
+<script>
+  /* ================= CONFIG ================= */
+  let config = JSON.parse(localStorage.getItem("config") || '{}');
+  const baseUrlEl = document.getElementById("baseUrl");
+  const apiPathEl = document.getElementById("apiPath");
+  const apiKeyEl = document.getElementById("apiKey");
 
-    baseUrlInput.value = baseUrl;
-    apiPathInput.value = apiPath;
-    apiKeyInput.value = apiKey;
+  baseUrlEl.value = config.baseUrl || "";
+  apiPathEl.value = config.apiPath || "";
+  apiKeyEl.value = config.apiKey || "";
 
-    function saveConfig() {
-      baseUrl = baseUrlInput.value.trim();
-      apiPath = apiPathInput.value.trim();
-      apiKey = apiKeyInput.value.trim();
+  function saveConfig() {
+    config = {
+      baseUrl: baseUrlEl.value.trim(),
+      apiPath: apiPathEl.value.trim(),
+      apiKey: apiKeyEl.value.trim()
+    };
+    localStorage.setItem("config", JSON.stringify(config));
+  }
 
-      localStorage.setItem("baseUrl", baseUrl);
-      localStorage.setItem("apiPath", apiPath);
-      localStorage.setItem("apiKey", apiKey);
-    }
+  [baseUrlEl, apiPathEl, apiKeyEl].forEach(i => i.addEventListener("change", saveConfig));
 
-    baseUrlInput.addEventListener("change", saveConfig);
-    apiPathInput.addEventListener("change", saveConfig);
-    apiKeyInput.addEventListener("change", saveConfig);
+  function apiUrl() {
+    if (!config.baseUrl || !config.apiPath) return null;
+    return config.baseUrl.replace(/\/$/, '') + '/' + config.apiPath.replace(/^\//, '');
+  }
 
-    function buildHeaders() {
-      const headers = { "Content-Type": "application/json" };
-      if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
-      return headers;
-    }
+  function headers() {
+    const h = { "Content-Type": "application/json" };
+    if (config.apiKey) h.Authorization = `Bearer ${config.apiKey}`;
+    return h;
+  }
 
-    function getApiUrl() {
-      if (!baseUrl || !apiPath) return null;
-      return baseUrl.replace(/\/$/, "") + "/" + apiPath.replace(/^\//, "");
-    }
+  /* ================= CHATS ================= */
+  let chats = JSON.parse(localStorage.getItem("chats") || '[]');
+  let activeChat = null;
 
-    // ==============================
+  function newChat() {
+    const chat = { id: crypto.randomUUID(), title: "New Chat", messages: [] };
+    chats.unshift(chat);
+    activeChat = chat.id;
+    persist();
+    renderChats();
+    renderMessages();
+  }
 
-    const errorLog = [];
-    const messagesEl = document.getElementById("messages");
-    const inputEl = document.getElementById("input");
-    const sendBtn = document.getElementById("send");
+  function persist() {
+    localStorage.setItem("chats", JSON.stringify(chats));
+  }
 
-    function addMessage(text, role) {
+  function renderChats() {
+    const list = document.getElementById("chatList");
+    list.innerHTML = "";
+    chats.forEach(c => {
       const div = document.createElement("div");
-      div.className = `message ${role}`;
-      div.textContent = text;
-      messagesEl.appendChild(div);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-
-    async function sendMessage() {
-      const text = inputEl.value.trim();
-      if (!text) return;
-
-      addMessage(text, "user");
-      inputEl.value = "";
-      sendBtn.disabled = true;
-
-      try {
-        const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("API URL not configured");
-
-        const res = await fetch(apiUrl, {
-          method: "POST",
-          headers: buildHeaders(),
-          body: JSON.stringify({ message: text })
-        });
-
-        if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(`HTTP ${res.status}: ${errText}`);
+      div.className = "chat-item" + (c.id === activeChat ? " active" : "");
+      div.innerHTML = `<span>${c.title}</span><span class="dots">⋮</span>`;
+      div.onclick = () => { activeChat = c.id; renderChats(); renderMessages(); };
+      div.querySelector('.dots').onclick = e => {
+        e.stopPropagation();
+        if (confirm("Delete this chat?")) {
+          chats = chats.filter(x => x.id !== c.id);
+          activeChat = chats[0]?.id || null;
+          persist();
+          renderChats();
+          renderMessages();
         }
+      };
+      list.appendChild(div);
+    });
+  }
 
-        const data = await res.json();
-        addMessage(data.reply || "(No response)", "bot");
-      } catch (err) {
-        errorLog.push(err.message);
-        addMessage("⚠️ " + err.message, "bot");
-      } finally {
-        sendBtn.disabled = false;
-      }
+  function renderMessages() {
+    const box = document.getElementById("messages");
+    box.innerHTML = "";
+    const chat = chats.find(c => c.id === activeChat);
+    document.getElementById("chatTitle").textContent = chat?.title || "No Chat";
+    chat?.messages.forEach(m => {
+      const div = document.createElement("div");
+      div.className = `message ${m.role}`;
+      div.textContent = m.text;
+      box.appendChild(div);
+    });
+    box.scrollTop = box.scrollHeight;
+  }
+
+  /* ================= CHAT SEND ================= */
+  document.getElementById("send").onclick = async () => {
+    const input = document.getElementById("input");
+    const text = input.value.trim();
+    if (!text || !activeChat) return;
+
+    const chat = chats.find(c => c.id === activeChat);
+    chat.messages.push({ role: "user", text });
+    input.value = "";
+    renderMessages();
+
+    try {
+      const url = apiUrl();
+      if (!url) throw new Error("API not configured");
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ message: text })
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      chat.messages.push({ role: "bot", text: data.reply || "(no reply)" });
+    } catch (e) {
+      chat.messages.push({ role: "bot", text: "⚠️ " + e.message });
     }
 
-    sendBtn.addEventListener("click", sendMessage);
-    inputEl.addEventListener("keydown", e => {
-      if (e.key === "Enter") sendMessage();
-    });
-  </script>
+    persist();
+    renderMessages();
+  };
+
+  /* ================= UI ================= */
+  document.getElementById("addChat").onclick = newChat;
+  document.getElementById("openSettings").onclick = () => document.getElementById("settingsModal").classList.add("show");
+  document.getElementById("closeSettings").onclick = () => document.getElementById("settingsModal").classList.remove("show");
+
+  if (!chats.length) newChat();
+  renderChats();
+</script>
 </body>
 </html>
