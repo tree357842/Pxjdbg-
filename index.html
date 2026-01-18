@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Chat UI</title>
   <style>
-    :root{--bg:#0f172a;--panel:#111827;--panel2:#020617;--user:#2563eb;--bot:#1f2937;--text:#e5e7eb;--muted:#9ca3af;--accent:#22c55e}
+    :root{--bg:#0f172a;--panel:#111827;--panel2:#020617;--user:#2563eb;--bot:#1f2937;--text:#e5e7eb;--muted:#9ca3af}
     *{box-sizing:border-box}
     body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text);height:100vh;display:flex}
 
@@ -16,7 +16,7 @@
     .chat-item.active,.chat-item:hover{background:#1f2937}
     .dots{color:var(--muted);padding:4px;cursor:pointer}
 
-    .dropdown{position:absolute;right:10px;top:36px;background:var(--panel);border:1px solid #1f2937;border-radius:8px;display:none;flex-direction:column;min-width:160px;z-index:1000}
+    .dropdown{position:fixed;left:260px;background:var(--panel);border:1px solid #1f2937;border-radius:8px;display:none;flex-direction:column;min-width:180px;z-index:1000}
     .dropdown button{background:none;border:none;color:var(--text);padding:10px;text-align:left;cursor:pointer;width:100%}
     .dropdown button:hover{background:#1f2937}
 
@@ -29,7 +29,10 @@
 
     footer{padding:12px;border-top:1px solid #1f2937;display:flex;gap:8px}
     textarea{flex:1;padding:12px;border-radius:8px;border:none;resize:none;font-size:15px}
-    button{padding:10px 14px;border-radius:8px;border:none;background:var(--accent);font-weight:600;cursor:pointer}
+    button{padding:8px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:18px}
+button:hover{background:#1f2937;color:var(--text)}
+.icon-btn{font-weight:600}
+    button:hover{background:#1f2937}
 
     .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:30}
     .modal.show{display:flex}
@@ -42,31 +45,29 @@
 <body>
 
 <div class="sidebar">
-  <header><span>Chats</span><button id="addChat">＋</button></header>
+  <header><span>Chats</span><button id="addChat" class="icon-btn" title="New chat" aria-label="New chat">+</button></header>
   <div id="chatList" class="chat-list"></div>
 </div>
 
 <div class="main">
-  <div class="topbar"><span id="chatTitle"></span><button id="openSettings">Settings</button></div>
+  <div class="topbar"><span id="chatTitle"></span><button id="openSettings" class="icon-btn" title="Settings" aria-label="Settings">&#9881;</button></div>
   <div id="messages" class="messages"></div>
   <footer>
     <textarea id="input" rows="1" placeholder="Enter to send • Shift+Enter for newline"></textarea>
-    <button id="send">Send</button>
+    <button id="send" class="icon-btn" title="Send" aria-label="Send">&rarr;</button>
   </footer>
 </div>
 
-<!-- Global Settings -->
 <div id="settingsModal" class="modal">
   <div class="modal-content">
     <strong>API Settings</strong>
     <div class="field"><label>Base URL</label><input id="baseUrl" /></div>
     <div class="field"><label>API Path</label><input id="apiPath" /></div>
     <div class="field"><label>API Key (optional)</label><input id="apiKey" /></div>
-    <button onclick="settingsModal.classList.remove('show')">Close</button>
+    <button id="closeSettings">Close</button>
   </div>
 </div>
 
-<!-- Chat Settings -->
 <div id="chatModal" class="modal">
   <div class="modal-content">
     <strong>Chat Settings</strong>
@@ -75,80 +76,102 @@
     <div class="field"><label>Temperature</label><input id="tempInput" type="number" step="0.1" min="0" max="2" /></div>
     <div class="field"><label>Max tokens</label><input id="tokenInput" type="number" /></div>
     <div class="field"><label>System instructions</label><textarea id="systemInput" rows="3"></textarea></div>
-    <button onclick="saveChatSettings()">Save</button>
+    <button id="saveChat">Save</button>
   </div>
 </div>
 
-<div id="version" style="position:fixed;bottom:8px;right:12px;font-size:12px;color:#9ca3af;z-index:2000">v1.0.0</div>
+<div id="version" style="position:fixed;bottom:8px;right:12px;font-size:12px;color:#9ca3af;z-index:2000">v1.0.1</div>
 
 <script>
-let config=JSON.parse(localStorage.getItem('config')||'{}');
-baseUrl.value=config.baseUrl||'';apiPath.value=config.apiPath||'';apiKey.value=config.apiKey||'';
-[baseUrl,apiPath,apiKey].forEach(i=>i.onchange=()=>{config={baseUrl:baseUrl.value,apiPath:apiPath.value,apiKey:apiKey.value};localStorage.setItem('config',JSON.stringify(config));});
+document.addEventListener('DOMContentLoaded',()=>{
+  const sendBtn=document.getElementById('send');
+  const input=document.getElementById('input');
+  const messages=document.getElementById('messages');
+  const chatList=document.getElementById('chatList');
+  const chatTitle=document.getElementById('chatTitle');
+  const addChat=document.getElementById('addChat');
+  const openSettings=document.getElementById('openSettings');
+  const settingsModal=document.getElementById('settingsModal');
+  const chatModal=document.getElementById('chatModal');
 
-function apiUrl(){return config.baseUrl&&config.apiPath?config.baseUrl.replace(/\/$/,'')+'/'+config.apiPath.replace(/^\//,''):null}
-function headers(){const h={'Content-Type':'application/json'};if(config.apiKey)h.Authorization=`Bearer ${config.apiKey}`;return h}
+  let config=JSON.parse(localStorage.getItem('config')||'{}');
+  baseUrl.value=config.baseUrl||'';
+  apiPath.value=config.apiPath||'';
+  apiKey.value=config.apiKey||'';
 
-let chats=JSON.parse(localStorage.getItem('chats')||'[]');
-let activeChat=null;
-let openMenu=null;
+  [baseUrl,apiPath,apiKey].forEach(i=>i.onchange=()=>{
+    config={baseUrl:baseUrl.value,apiPath:apiPath.value,apiKey:apiKey.value};
+    localStorage.setItem('config',JSON.stringify(config));
+  });
 
-function newChat(){const c={id:crypto.randomUUID(),title:'New Chat',settings:{model:'',temperature:1,max_tokens:100,system:''},messages:[]};chats.unshift(c);activeChat=c.id;save();render();}
-function save(){localStorage.setItem('chats',JSON.stringify(chats));}
+  function apiUrl(){return config.baseUrl&&config.apiPath?config.baseUrl.replace(/\/$/,'')+'/'+config.apiPath.replace(/^\//,''):null}
+  function headers(){const h={'Content-Type':'application/json'};if(config.apiKey)h.Authorization=`Bearer ${config.apiKey}`;return h}
 
-function render(){renderChats();renderMessages();}
+  let chats=JSON.parse(localStorage.getItem('chats')||'[]');
+  let activeChat=null;
+  let openMenu=null;
 
-function renderChats(){chatList.innerHTML='';chats.forEach(c=>{
-  const row=document.createElement('div');row.className='chat-item'+(c.id===activeChat?' active':'');
-  const title=document.createElement('span');title.textContent=c.title;
-  const dots=document.createElement('span');dots.className='dots';dots.textContent='⋮';
-  const menu=document.createElement('div');menu.className='dropdown';menu.onclick=e=>e.stopPropagation();
+  function newChat(){const c={id:crypto.randomUUID(),title:'New Chat',settings:{model:'',temperature:1,max_tokens:100,system:''},messages:[]};chats.unshift(c);activeChat=c.id;save();render();}
+  function save(){localStorage.setItem('chats',JSON.stringify(chats));}
 
-  const btnSettings=document.createElement('button');btnSettings.textContent='Chat settings';
-  btnSettings.onclick=()=>{openChatSettings(c.id);menu.style.display='none'};
+  function render(){renderChats();renderMessages();}
 
-  const btnDelete=document.createElement('button');btnDelete.textContent='Delete chat';
-  btnDelete.onclick=()=>{if(confirm('Delete chat?')){chats=chats.filter(x=>x.id!==c.id);activeChat=chats[0]?.id||null;save();render()}};
+  function renderChats(){chatList.innerHTML='';chats.forEach(c=>{
+    const row=document.createElement('div');row.className='chat-item'+(c.id===activeChat?' active':'');
+    const title=document.createElement('span');title.textContent=c.title;
+    const dots=document.createElement('span');dots.className='dots';dots.textContent='⋮';
+    const menu=document.createElement('div');menu.className='dropdown';menu.onclick=e=>e.stopPropagation();
 
-  menu.append(btnSettings,btnDelete);
+    const btnSettings=document.createElement('button');btnSettings.textContent='Chat settings';
+    btnSettings.onclick=()=>{openChatSettings(c.id);menu.style.display='none'};
 
-  dots.onclick=e=>{e.stopPropagation();if(openMenu&&openMenu!==menu)openMenu.style.display='none';menu.style.display=menu.style.display==='flex'?'none':'flex';openMenu=menu};
+    const btnDelete=document.createElement('button');btnDelete.textContent='Delete chat';
+    btnDelete.onclick=()=>{if(confirm('Delete chat?')){chats=chats.filter(x=>x.id!==c.id);activeChat=chats[0]?.id||null;save();render()}};
 
-  row.onclick=()=>{if(openMenu){openMenu.style.display='none';openMenu=null}activeChat=c.id;render()};
-  row.append(title,dots,menu);
-  chatList.appendChild(row);
-});}
+    menu.append(btnSettings,btnDelete);
 
-window.onclick=()=>{if(openMenu){openMenu.style.display='none';openMenu=null}};
+    dots.onclick=e=>{e.stopPropagation();if(openMenu&&openMenu!==menu)openMenu.style.display='none';const r=row.getBoundingClientRect();menu.style.top=`${r.top}px`;menu.style.display=menu.style.display==='flex'?'none':'flex';openMenu=menu};
 
-function renderMessages(){messages.innerHTML='';const c=chats.find(x=>x.id===activeChat);chatTitle.textContent=c?.title||'';
- c?.messages.forEach(m=>{const d=document.createElement('div');d.className='message '+m.role;d.textContent=m.text;messages.appendChild(d)});
- messages.scrollTop=messages.scrollHeight}
+    row.onclick=()=>{if(openMenu){openMenu.style.display='none';openMenu=null}activeChat=c.id;render()};
+    row.append(title,dots,menu);
+    chatList.appendChild(row);
+  });}
 
-send.onclick=sendMessage;
-input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}});
+  window.onclick=()=>{if(openMenu){openMenu.style.display='none';openMenu=null}};
 
-async function sendMessage(){const text=input.value.trim();if(!text||!activeChat)return;const c=chats.find(x=>x.id===activeChat);
- c.messages.push({role:'user',text});input.value='';renderMessages();
- try{const res=await fetch(apiUrl(),{method:'POST',headers:headers(),body:JSON.stringify({message:text,settings:c.settings})});
- if(!res.ok)throw new Error(await res.text());const data=await res.json();
- c.messages.push({role:'bot',text:data.reply||'(no reply)'});}catch(e){c.messages.push({role:'bot',text:'⚠️ '+e.message})}
- save();renderMessages();}
+  function renderMessages(){messages.innerHTML='';const c=chats.find(x=>x.id===activeChat);chatTitle.textContent=c?.title||'';
+    c?.messages.forEach(m=>{const d=document.createElement('div');d.className='message '+m.role;d.textContent=m.text;messages.appendChild(d)});
+    messages.scrollTop=messages.scrollHeight}
 
-function openChatSettings(id){activeChat=id;const c=chats.find(x=>x.id===id);
- chatTitleInput.value=c.title;modelInput.value=c.settings.model;tempInput.value=c.settings.temperature;
- tokenInput.value=c.settings.max_tokens;systemInput.value=c.settings.system;
- chatModal.classList.add('show');}
+  sendBtn.onclick=sendMessage;
+  input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}});
 
-function saveChatSettings(){const c=chats.find(x=>x.id===activeChat);
- c.title=chatTitleInput.value||c.title;
- c.settings={model:modelInput.value,temperature:+tempInput.value||1,max_tokens:+tokenInput.value||100,system:systemInput.value};
- chatModal.classList.remove('show');save();render();}
+  async function sendMessage(){const text=input.value.trim();if(!text||!activeChat)return;const c=chats.find(x=>x.id===activeChat);
+    c.messages.push({role:'user',text});input.value='';renderMessages();
+    try{const res=await fetch(apiUrl(),{method:'POST',headers:headers(),body:JSON.stringify({message:text,settings:c.settings})});
+      if(!res.ok)throw new Error(await res.text());const data=await res.json();
+      c.messages.push({role:'bot',text:data.reply||'(no reply)'});}catch(e){c.messages.push({role:'bot',text:'⚠️ '+e.message})}
+    save();renderMessages();}
 
-openSettings.onclick=()=>settingsModal.classList.add('show');
-addChat.onclick=newChat;
+  function openChatSettings(id){activeChat=id;const c=chats.find(x=>x.id===id);
+    chatTitleInput.value=c.title;modelInput.value=c.settings.model;tempInput.value=c.settings.temperature;
+    tokenInput.value=c.settings.max_tokens;systemInput.value=c.settings.system;
+    chatModal.classList.add('show');}
 
-if(!chats.length)newChat();render();
+  document.getElementById('saveChat').onclick=()=>{
+    const c=chats.find(x=>x.id===activeChat);
+    c.title=chatTitleInput.value||c.title;
+    c.settings={model:modelInput.value,temperature:+tempInput.value||1,max_tokens:+tokenInput.value||100,system:systemInput.value};
+    chatModal.classList.remove('show');save();render();
+  };
+
+  openSettings.onclick=()=>settingsModal.classList.add('show');
+  document.getElementById('closeSettings').onclick=()=>settingsModal.classList.remove('show');
+  addChat.onclick=newChat;
+
+  if(!chats.length)newChat();
+  render();
+});
 </script>
 </body>
 </html>
