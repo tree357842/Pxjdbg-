@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Chat UI</title>
   <style>
-    :root{--bg:#0f172a;--panel:#111827;--panel2:#020617;--user:#2563eb;--bot:#1f2937;--text:#e5e7eb;--muted:#9ca3af}
+    :root{--bg:#0f172a;--panel:#111827;--panel2:#020617;--user:#2563eb;--bot:#1f2937;--text:#e5e7eb;--muted:#9ca3af;--danger:#dc2626}
     *{box-sizing:border-box}
     body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text);height:100vh;display:flex}
 
@@ -21,7 +21,12 @@
 
     .main{flex:1;display:flex;flex-direction:column}
     .topbar{padding:12px 16px;border-bottom:1px solid #1f2937;display:flex;justify-content:space-between;align-items:center}
-    .topbar-actions{display:flex;gap:8px}
+    .topbar-actions{display:flex;align-items:center;gap:8px}
+
+    .delete-chat{color:transparent;font-weight:700;transition:color .15s}
+    .topbar-actions:hover .delete-chat{color:var(--danger)}
+    .delete-chat:hover{background:rgba(220,38,38,.15)}
+
     .messages{flex:1;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px}
     .message{max-width:80%;padding:12px 14px;border-radius:10px;white-space:pre-wrap}
     .user{background:var(--user);align-self:flex-end}
@@ -43,7 +48,7 @@
 <div class="sidebar">
   <header>
     <span>Chats</span>
-    <button id="addChat" class="icon-btn" type="button">＋</button>
+    <button id="addChat" class="icon-btn" type="button">+</button>
   </header>
   <div id="chatList" class="chat-list"></div>
 </div>
@@ -52,7 +57,8 @@
   <div class="topbar">
     <span id="chatTitle"></span>
     <div class="topbar-actions">
-      <button id="editChat" class="icon-btn" type="button">Edit</button>
+      <button id="chatSettings" class="icon-btn" type="button">Chat Settings</button>
+      <button id="deleteChat" class="icon-btn delete-chat" type="button" title="Delete chat">×</button>
       <button id="openSettings" class="icon-btn" type="button">Settings</button>
     </div>
   </div>
@@ -85,7 +91,7 @@
   </div>
 </div>
 
-<div id="version" style="position:fixed;bottom:8px;right:12px;font-size:12px;color:#9ca3af">v1.0.4</div>
+<div id="version" style="position:fixed;bottom:8px;right:12px;font-size:12px;color:#9ca3af">v1.0.5</div>
 
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
@@ -96,7 +102,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   const chatTitle=document.getElementById('chatTitle');
   const addChat=document.getElementById('addChat');
   const openSettings=document.getElementById('openSettings');
-  const editChat=document.getElementById('editChat');
+  const chatSettings=document.getElementById('chatSettings');
+  const deleteChat=document.getElementById('deleteChat');
   const settingsModal=document.getElementById('settingsModal');
   const chatModal=document.getElementById('chatModal');
 
@@ -177,6 +184,14 @@ document.addEventListener('DOMContentLoaded',()=>{
     chatModal.classList.add('show');
   }
 
+  function removeChat(){
+    if(!activeChat)return;
+    if(!confirm('Delete this chat?'))return;
+    chats=chats.filter(c=>c.id!==activeChat);
+    activeChat=chats[0]?.id||null;
+    save();render();
+  }
+
   document.getElementById('saveChat').onclick=()=>{
     const c=chats.find(x=>x.id===activeChat);
     c.title=chatTitleInput.value||c.title;
@@ -190,7 +205,8 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   openSettings.onclick=()=>settingsModal.classList.add('show');
   document.getElementById('closeSettings').onclick=()=>settingsModal.classList.remove('show');
-  editChat.onclick=openChatSettings;
+  chatSettings.onclick=openChatSettings;
+  deleteChat.onclick=removeChat;
   addChat.onclick=newChat;
 
   if(!chats.length)newChat();
