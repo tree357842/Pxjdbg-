@@ -72,9 +72,8 @@
 <div id="settingsModal" class="modal">
   <div class="modal-content">
     <strong>API Settings</strong>
-    <div class="field"><label>Base URL</label><input id="baseUrl" /></div>
-    <div class="field"><label>API Path</label><input id="apiPath" /></div>
-    <div class="field"><label>API Key (optional)</label><input id="apiKey" /></div>
+    <div class="field"><label>Base URL (full endpoint)</label><input id="baseUrl" placeholder="https://api.example.com/v1/chat" /></div>
+    <div class="field"><label>API Key (optional)</label><input id="apiKey" placeholder="Bearer token if required" /></div>
     <button id="closeSettings" type="button">Close</button>
   </div>
 </div>
@@ -91,7 +90,7 @@
   </div>
 </div>
 
-<div id="version" style="position:fixed;bottom:8px;right:12px;font-size:12px;color:#9ca3af">v1.0.5</div>
+<div id="version" style="position:fixed;bottom:8px;right:12px;font-size:12px;color:#9ca3af">v1.0.7</div>
 
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
@@ -107,23 +106,36 @@ document.addEventListener('DOMContentLoaded',()=>{
   const settingsModal=document.getElementById('settingsModal');
   const chatModal=document.getElementById('chatModal');
 
+  const baseUrl=document.getElementById('baseUrl');
+  const apiKey=document.getElementById('apiKey');
+
   let config=JSON.parse(localStorage.getItem('config')||'{}');
   baseUrl.value=config.baseUrl||'';
-  apiPath.value=config.apiPath||'';
   apiKey.value=config.apiKey||'';
 
-  [baseUrl,apiPath,apiKey].forEach(i=>i.onchange=()=>{
-    config={baseUrl:baseUrl.value,apiPath:apiPath.value,apiKey:apiKey.value};
+  [baseUrl,apiKey].forEach(i=>i.onchange=()=>{
+    config={baseUrl:baseUrl.value,apiKey:apiKey.value};
     localStorage.setItem('config',JSON.stringify(config));
   });
 
-  function apiUrl(){return config.baseUrl&&config.apiPath?config.baseUrl.replace(/\/$/,'')+'/'+config.apiPath.replace(/^\//,''):null}
-  function headers(){const h={'Content-Type':'application/json'};if(config.apiKey)h.Authorization=`Bearer ${config.apiKey}`;return h}
+  function apiUrl(){
+    if(!config.baseUrl) throw new Error('Base URL is not set');
+    return config.baseUrl.trim();
+  }
+
+  function headers(){
+    const h={'Content-Type':'application/json'};
+    if(config.apiKey) h.Authorization=`Bearer ${config.apiKey}`;
+    return h;
+  }
 
   let chats=JSON.parse(localStorage.getItem('chats')||'[]');
   let activeChat=null;
 
-  function newChat(){const c={id:crypto.randomUUID(),title:'New Chat',settings:{model:'',temperature:1,max_tokens:100,system:''},messages:[]};chats.unshift(c);activeChat=c.id;save();render();}
+  function newChat(){
+    const c={id:crypto.randomUUID(),title:'New Chat',settings:{model:'',temperature:1,max_tokens:100,system:''},messages:[]};
+    chats.unshift(c);activeChat=c.id;save();render();
+  }
   function save(){localStorage.setItem('chats',JSON.stringify(chats));}
 
   function render(){renderChats();renderMessages();}
@@ -157,24 +169,24 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   async function sendMessage(){
     const text=input.value.trim();
-    if(!text||!activeChat)return;
+    if(!text||!activeChat) return;
     const c=chats.find(x=>x.id===activeChat);
     c.messages.push({role:'user',text});
     input.value='';
     renderMessages();
     try{
       const res=await fetch(apiUrl(),{method:'POST',headers:headers(),body:JSON.stringify({message:text,settings:c.settings})});
-      if(!res.ok)throw new Error(await res.text());
+      if(!res.ok) throw new Error(await res.text());
       const data=await res.json();
       c.messages.push({role:'bot',text:data.reply||'(no reply)'});
     }catch(e){
-      c.messages.push({role:'bot',text:'⚠️ '+e.message});
+      c.messages.push({role:'bot',text:'Error: '+e.message});
     }
     save();renderMessages();
   }
 
   function openChatSettings(){
-    if(!activeChat)return;
+    if(!activeChat) return;
     const c=chats.find(x=>x.id===activeChat);
     chatTitleInput.value=c.title;
     modelInput.value=c.settings.model;
@@ -185,8 +197,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 
   function removeChat(){
-    if(!activeChat)return;
-    if(!confirm('Delete this chat?'))return;
+    if(!activeChat) return;
+    if(!confirm('Delete this chat?')) return;
     chats=chats.filter(c=>c.id!==activeChat);
     activeChat=chats[0]?.id||null;
     save();render();
@@ -209,7 +221,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   deleteChat.onclick=removeChat;
   addChat.onclick=newChat;
 
-  if(!chats.length)newChat();
+  if(!chats.length) newChat();
   render();
 });
 </script>
