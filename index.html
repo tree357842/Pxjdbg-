@@ -5,20 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Chat UI</title>
   <style>
-    :root {
-      --bg:#0f172a;--panel:#111827;--panel-2:#020617;
-      --user:#2563eb;--bot:#1f2937;--text:#e5e7eb;
-      --muted:#9ca3af;--accent:#22c55e
-    }
+    :root{--bg:#0f172a;--panel:#111827;--panel2:#020617;--user:#2563eb;--bot:#1f2937;--text:#e5e7eb;--muted:#9ca3af;--accent:#22c55e}
     *{box-sizing:border-box}
     body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text);height:100vh;display:flex}
 
-    .sidebar{width:260px;background:var(--panel-2);border-right:1px solid #1f2937;display:flex;flex-direction:column}
+    .sidebar{width:260px;background:var(--panel2);border-right:1px solid #1f2937;display:flex;flex-direction:column}
     .sidebar header{padding:14px;display:flex;justify-content:space-between;align-items:center;font-weight:600}
     .chat-list{flex:1;overflow-y:auto}
-    .chat-item{padding:10px 14px;display:flex;justify-content:space-between;cursor:pointer}
+    .chat-item{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;position:relative}
     .chat-item.active,.chat-item:hover{background:#1f2937}
-    .dots{color:var(--muted)}
+    .dots{color:var(--muted);padding:4px}
+
+    .dropdown{position:absolute;right:10px;top:36px;background:var(--panel);border:1px solid #1f2937;border-radius:8px;display:none;flex-direction:column;min-width:160px;z-index:10}
+    .dropdown button{background:none;border:none;color:var(--text);padding:10px;text-align:left;cursor:pointer}
+    .dropdown button:hover{background:#1f2937}
 
     .main{flex:1;display:flex;flex-direction:column}
     .topbar{padding:12px 16px;border-bottom:1px solid #1f2937;display:flex;justify-content:space-between}
@@ -34,11 +34,7 @@
     .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center}
     .modal.show{display:flex}
     .modal-content{background:var(--panel);padding:20px;border-radius:12px;width:380px;display:flex;flex-direction:column;gap:8px}
-    .modal-content input{background:#020617;color:var(--text)}
-
-    .menu{position:absolute;background:var(--panel);border:1px solid #1f2937;border-radius:8px;display:none;flex-direction:column}
-    .menu button{background:none;color:var(--text);text-align:left}
-    .menu button:hover{background:#1f2937}
+    .modal-content input,.modal-content textarea{background:#020617;color:var(--text)}
   </style>
 </head>
 <body>
@@ -64,7 +60,7 @@
     <input id="baseUrl" placeholder="Base URL" />
     <input id="apiPath" placeholder="API Path" />
     <input id="apiKey" placeholder="API Key (optional)" />
-    <button onclick="toggleSettings(false)">Close</button>
+    <button onclick="settingsModal.classList.remove('show')">Close</button>
   </div>
 </div>
 
@@ -73,7 +69,7 @@
   <div class="modal-content">
     <strong>Chat Settings</strong>
     <input id="chatTitleInput" placeholder="Chat title" />
-    <input id="modelInput" placeholder="Model (e.g. gpt-4o)" />
+    <input id="modelInput" placeholder="Model" />
     <input id="tempInput" type="number" step="0.1" min="0" max="2" placeholder="Temperature" />
     <input id="tokenInput" type="number" placeholder="Max tokens" />
     <textarea id="systemInput" placeholder="System instructions"></textarea>
@@ -91,31 +87,56 @@ function headers(){const h={'Content-Type':'application/json'};if(config.apiKey)
 
 let chats=JSON.parse(localStorage.getItem('chats')||'[]');
 let activeChat=null;
+let openMenu=null;
 
 function newChat(){const c={id:crypto.randomUUID(),title:'New Chat',settings:{model:'',temperature:1,max_tokens:2048,system:''},messages:[]};chats.unshift(c);activeChat=c.id;save();render();}
 function save(){localStorage.setItem('chats',JSON.stringify(chats));}
 
 function render(){renderChats();renderMessages();}
 
-function renderChats(){chatList.innerHTML='';chats.forEach(c=>{const d=document.createElement('div');d.className='chat-item'+(c.id===activeChat?' active':'');d.innerHTML=`<span>${c.title}</span><span class='dots'>⋮</span>`;
- d.onclick=()=>{activeChat=c.id;render()};
- d.querySelector('.dots').onclick=e=>{e.stopPropagation();openChatSettings(c.id)};
- chatList.appendChild(d);});}
+function renderChats(){chatList.innerHTML='';chats.forEach(c=>{
+  const row=document.createElement('div');row.className='chat-item'+(c.id===activeChat?' active':'');
+  const title=document.createElement('span');title.textContent=c.title;
+  const dots=document.createElement('span');dots.className='dots';dots.textContent='⋮';
+  const menu=document.createElement('div');menu.className='dropdown';
+
+  const btnSettings=document.createElement('button');btnSettings.textContent='Chat settings';
+  btnSettings.onclick=()=>{openChatSettings(c.id);menu.style.display='none'};
+
+  const btnDelete=document.createElement('button');btnDelete.textContent='Delete chat';
+  btnDelete.onclick=()=>{if(confirm('Delete chat?')){chats=chats.filter(x=>x.id!==c.id);activeChat=chats[0]?.id||null;save();render()}};
+
+  menu.append(btnSettings,btnDelete);
+
+  dots.onclick=e=>{
+    e.stopPropagation();
+    if(openMenu&&openMenu!==menu)openMenu.style.display='none';
+    menu.style.display=menu.style.display==='flex'?'none':'flex';
+    openMenu=menu;
+  };
+
+  row.onclick=()=>{activeChat=c.id;render()};
+  row.append(title,dots,menu);
+  chatList.appendChild(row);
+});}
+
+window.onclick=()=>{if(openMenu){openMenu.style.display='none';openMenu=null}};
 
 function renderMessages(){messages.innerHTML='';const c=chats.find(x=>x.id===activeChat);chatTitle.textContent=c?.title||'';
-c?.messages.forEach(m=>{const d=document.createElement('div');d.className='message '+m.role;d.textContent=m.text;messages.appendChild(d)});messages.scrollTop=messages.scrollHeight}
+ c?.messages.forEach(m=>{const d=document.createElement('div');d.className='message '+m.role;d.textContent=m.text;messages.appendChild(d)});
+ messages.scrollTop=messages.scrollHeight}
 
 send.onclick=sendMessage;
 input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}});
 
-async function sendMessage(){const text=input.value.trim();if(!text)return;const c=chats.find(x=>x.id===activeChat);
-c.messages.push({role:'user',text});input.value='';renderMessages();
+async function sendMessage(){const text=input.value.trim();if(!text||!activeChat)return;const c=chats.find(x=>x.id===activeChat);
+ c.messages.push({role:'user',text});input.value='';renderMessages();
  try{const res=await fetch(apiUrl(),{method:'POST',headers:headers(),body:JSON.stringify({message:text,settings:c.settings})});
  if(!res.ok)throw new Error(await res.text());const data=await res.json();
  c.messages.push({role:'bot',text:data.reply||'(no reply)'});}catch(e){c.messages.push({role:'bot',text:'⚠️ '+e.message})}
  save();renderMessages();}
 
-function openChatSettings(id){const c=chats.find(x=>x.id===id);activeChat=id;
+function openChatSettings(id){activeChat=id;const c=chats.find(x=>x.id===id);
  chatTitleInput.value=c.title;modelInput.value=c.settings.model;tempInput.value=c.settings.temperature;
  tokenInput.value=c.settings.max_tokens;systemInput.value=c.settings.system;
  chatModal.classList.add('show');}
@@ -126,7 +147,7 @@ function saveChatSettings(){const c=chats.find(x=>x.id===activeChat);
  chatModal.classList.remove('show');save();render();}
 
 openSettings.onclick=()=>settingsModal.classList.add('show');
-function toggleSettings(v){settingsModal.classList.toggle('show',v)}
+addChat.onclick=newChat;
 
 if(!chats.length)newChat();render();
 </script>
