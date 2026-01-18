@@ -14,9 +14,9 @@
     .chat-list{flex:1;overflow-y:auto}
     .chat-item{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;position:relative;z-index:1}
     .chat-item.active,.chat-item:hover{background:#1f2937}
-    .dots{color:var(--muted);padding:4px;cursor:pointer}
+    
 
-    .dropdown{position:fixed;left:260px;background:var(--panel);border:1px solid #1f2937;border-radius:8px;display:none;flex-direction:column;min-width:180px;z-index:1000}
+    
     .dropdown button{background:none;border:none;color:var(--text);padding:10px;text-align:left;cursor:pointer;width:100%}
     .dropdown button:hover{background:#1f2937}
 
@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   let chats=JSON.parse(localStorage.getItem('chats')||'[]');
   let activeChat=null;
-  let openMenu=null;
+  /* dropdown removed */
 
   function newChat(){const c={id:crypto.randomUUID(),title:'New Chat',settings:{model:'',temperature:1,max_tokens:100,system:''},messages:[]};chats.unshift(c);activeChat=c.id;save();render();}
   function save(){localStorage.setItem('chats',JSON.stringify(chats));}
@@ -119,25 +119,20 @@ document.addEventListener('DOMContentLoaded',()=>{
   function renderChats(){chatList.innerHTML='';chats.forEach(c=>{
     const row=document.createElement('div');row.className='chat-item'+(c.id===activeChat?' active':'');
     const title=document.createElement('span');title.textContent=c.title;
-    const dots=document.createElement('span');dots.className='dots';dots.textContent='⋮';
-    const menu=document.createElement('div');menu.className='dropdown';menu.onclick=e=>e.stopPropagation();
+    const btnGear=document.createElement('button');btnGear.className='icon-btn';btnGear.textContent='⚙';btnGear.title='Chat settings';
+    btnGear.onclick=e=>{e.stopPropagation();openChatSettings(c.id)};
 
-    const btnSettings=document.createElement('button');btnSettings.textContent='Chat settings';
-    btnSettings.onclick=e=>{e.stopPropagation();openChatSettings(c.id);menu.style.display='none';openMenu=null};
-
-    const btnDelete=document.createElement('button');btnDelete.textContent='Delete chat';
-    btnDelete.onclick=e=>{e.stopPropagation();if(confirm('Delete chat?')){chats=chats.filter(x=>x.id!==c.id);activeChat=chats[0]?.id||null;openMenu=null;save();render()}};
-
-    menu.append(btnSettings,btnDelete);
+    const btnTrash=document.createElement('button');btnTrash.className='icon-btn';btnTrash.textContent='🗑';btnTrash.title='Delete chat';
+    btnTrash.onclick=e=>{e.stopPropagation();if(confirm('Delete chat?')){chats=chats.filter(x=>x.id!==c.id);activeChat=chats[0]?.id||null;save();render()}};
 
     dots.onclick=e=>{e.stopPropagation();if(openMenu&&openMenu!==menu)openMenu.style.display='none';const r=row.getBoundingClientRect();menu.style.top=`${r.top}px`;menu.style.display=menu.style.display==='flex'?'none':'flex';openMenu=menu};
 
     row.onclick=()=>{if(openMenu){openMenu.style.display='none';openMenu=null}activeChat=c.id;render()};
-    row.append(title,dots,menu);
+    row.append(title,btnGear,btnTrash);
     chatList.appendChild(row);
   });}
 
-  window.onclick=()=>{if(openMenu){openMenu.style.display='none';openMenu=null}};
+  /* no global menu click needed */
 
   function renderMessages(){messages.innerHTML='';const c=chats.find(x=>x.id===activeChat);chatTitle.textContent=c?.title||'';
     c?.messages.forEach(m=>{const d=document.createElement('div');d.className='message '+m.role;d.textContent=m.text;messages.appendChild(d)});
