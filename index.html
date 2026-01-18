@@ -12,11 +12,14 @@
     .sidebar{width:260px;background:var(--panel2);border-right:1px solid #1f2937;display:flex;flex-direction:column}
     .sidebar header{padding:14px;display:flex;justify-content:space-between;align-items:center;font-weight:600}
     .chat-list{flex:1;overflow-y:auto}
-    .chat-item{padding:10px 14px;display:flex;align-items:center;gap:6px;cursor:pointer;position:relative}
+    .chat-item{padding:10px 14px;display:flex;align-items:center;gap:6px;cursor:pointer}
     .chat-item.active,.chat-item:hover{background:#1f2937}
     .chat-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .chat-actions{display:none;gap:4px}
     .chat-item:hover .chat-actions{display:flex}
+
+    .icon-btn{border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:4px}
+    .icon-btn:hover{color:var(--text)}
 
     .main{flex:1;display:flex;flex-direction:column}
     .topbar{padding:12px 16px;border-bottom:1px solid #1f2937;display:flex;justify-content:space-between}
@@ -27,9 +30,6 @@
 
     footer{padding:12px;border-top:1px solid #1f2937;display:flex;gap:8px}
     textarea{flex:1;padding:12px;border-radius:8px;border:none;resize:none;font-size:15px}
-    button{padding:8px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:18px}
-    button:hover{background:#1f2937;color:var(--text)}
-    .icon-btn{font-weight:600}
 
     .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:30}
     .modal.show{display:flex}
@@ -42,16 +42,22 @@
 <body>
 
 <div class="sidebar">
-  <header><span>Chats</span><button id="addChat" class="icon-btn" title="New chat">+</button></header>
+  <header>
+    <span>Chats</span>
+    <button id="addChat" class="icon-btn" title="New chat" type="button">＋</button>
+  </header>
   <div id="chatList" class="chat-list"></div>
 </div>
 
 <div class="main">
-  <div class="topbar"><span id="chatTitle"></span><button id="openSettings" class="icon-btn" title="Settings">⚙</button></div>
+  <div class="topbar">
+    <span id="chatTitle"></span>
+    <button id="openSettings" class="icon-btn" title="Settings" type="button">Settings</button>
+  </div>
   <div id="messages" class="messages"></div>
   <footer>
     <textarea id="input" rows="1" placeholder="Enter to send • Shift+Enter for newline"></textarea>
-    <button id="send" class="icon-btn" title="Send">→</button>
+    <button id="send" class="icon-btn" title="Send" type="button">Send</button>
   </footer>
 </div>
 
@@ -61,7 +67,7 @@
     <div class="field"><label>Base URL</label><input id="baseUrl" /></div>
     <div class="field"><label>API Path</label><input id="apiPath" /></div>
     <div class="field"><label>API Key (optional)</label><input id="apiKey" /></div>
-    <button id="closeSettings">Close</button>
+    <button id="closeSettings" type="button">Close</button>
   </div>
 </div>
 
@@ -73,11 +79,11 @@
     <div class="field"><label>Temperature</label><input id="tempInput" type="number" step="0.1" min="0" max="2" /></div>
     <div class="field"><label>Max tokens</label><input id="tokenInput" type="number" /></div>
     <div class="field"><label>System instructions</label><textarea id="systemInput" rows="3"></textarea></div>
-    <button id="saveChat">Save</button>
+    <button id="saveChat" type="button">Save</button>
   </div>
 </div>
 
-<div id="version" style="position:fixed;bottom:8px;right:12px;font-size:12px;color:#9ca3af">v1.0.2</div>
+<div id="version" style="position:fixed;bottom:8px;right:12px;font-size:12px;color:#9ca3af">v1.0.3</div>
 
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
@@ -127,14 +133,14 @@ document.addEventListener('DOMContentLoaded',()=>{
 
       const btnGear=document.createElement('button');
       btnGear.className='icon-btn';
-      btnGear.textContent='⚙';
-      btnGear.title='Chat settings';
+      btnGear.textContent='Edit';
+      btnGear.type='button';
       btnGear.onclick=e=>{e.stopPropagation();openChatSettings(c.id)};
 
       const btnTrash=document.createElement('button');
       btnTrash.className='icon-btn';
-      btnTrash.textContent='🗑';
-      btnTrash.title='Delete chat';
+      btnTrash.textContent='Delete';
+      btnTrash.type='button';
       btnTrash.onclick=e=>{e.stopPropagation();if(confirm('Delete chat?')){chats=chats.filter(x=>x.id!==c.id);activeChat=chats[0]?.id||null;save();render()}};
 
       actions.append(btnGear,btnTrash);
