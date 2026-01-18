@@ -123,10 +123,10 @@ document.addEventListener('DOMContentLoaded',()=>{
     const menu=document.createElement('div');menu.className='dropdown';menu.onclick=e=>e.stopPropagation();
 
     const btnSettings=document.createElement('button');btnSettings.textContent='Chat settings';
-    btnSettings.onclick=()=>{openChatSettings(c.id);menu.style.display='none'};
+    btnSettings.onclick=e=>{e.stopPropagation();openChatSettings(c.id);menu.style.display='none';openMenu=null};
 
     const btnDelete=document.createElement('button');btnDelete.textContent='Delete chat';
-    btnDelete.onclick=()=>{if(confirm('Delete chat?')){chats=chats.filter(x=>x.id!==c.id);activeChat=chats[0]?.id||null;save();render()}};
+    btnDelete.onclick=e=>{e.stopPropagation();if(confirm('Delete chat?')){chats=chats.filter(x=>x.id!==c.id);activeChat=chats[0]?.id||null;openMenu=null;save();render()}};
 
     menu.append(btnSettings,btnDelete);
 
